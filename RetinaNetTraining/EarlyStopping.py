@@ -1,19 +1,21 @@
+"""
+Patience class to check if training should be cancelled due to no improvement in the validation set.
+"""
+
 from os.path import join
 
 import numpy as np
 import torch
 
 
-########################################################################################################################
-# Custom Patience Class, only save best model, not latest.
-########################################################################################################################
 class EarlyStopping:
-    def __init__(self, patience=100, delta=0.5):
+    def __init__(self, patience=100, delta=0.05):
         self.patience = patience
         self.counter = 0
         self.best_score = None
         self.early_stop = False
         self.val_loss_min = np.Inf
+        self.best_epoch = 0
         # If current score within this range, it is considered the same as previous score.
         self.delta = delta
 
@@ -21,13 +23,19 @@ class EarlyStopping:
         score = -val_loss
 
         if self.best_score is None:
+            print(f'Saving first model... ', end='')
+            self.best_epoch = epoch
             self.best_score = score
             self.save_checkpoint(val_loss, model, epoch, optimiser, save_path)
         elif score < self.best_score + self.delta:
+            print(f'No improvement (delta: {self.delta})... ', end='')
+            self.counter += 1
             if self.counter >= self.patience:
                 self.early_stop = True
         else:
+            print('New best! Saving model... ', end='')
             self.best_score = score
+            self.best_epoch = epoch
             self.save_checkpoint(val_loss, model, epoch, optimiser, save_path)
             self.counter = 0
 

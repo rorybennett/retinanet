@@ -41,7 +41,7 @@ def check_degen_boxes(targets):
 def get_training_transforms(image_size):
     return v2.Compose([
         v2.Resize((image_size, image_size)),
-        v2.RandomAffine(degrees=30, shear=15, translate=(0.1, 0.1), scale=(0.3, 1)),
+        v2.RandomAffine(degrees=30, shear=15, translate=(0.1, 0.1), scale=(0.6, 1.2)),
         v2.RandomHorizontalFlip(p=0.2),
         v2.RandomErasing(0.5, scale=(0.02, 0.08)),
         v2.ToImage(),

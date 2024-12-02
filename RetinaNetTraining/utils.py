@@ -5,63 +5,6 @@ import numpy as np
 from matplotlib import pyplot as plt, patches
 
 
-def plot_losses(training_losses, training_cls_losses, training_bbox_losses, validation_losses, validation_cls_losses,
-                validation_bbox_losses, training_learning_rates, save_path):
-    """
-    Plot the training losses (combined, cls, and bbox) and validation losses (combined, cls, and bbox) along with the
-    learning rates. The figure will be saved at save_path/losses.png. The losses and rates should be in a list
-    that grows as the epochs increase.
-
-    :param training_losses: List of training losses.
-    :param training_cls_losses:
-    :param training_bbox_losses:
-    :param validation_losses: List of validation losses.
-    :param validation_cls_losses:
-    :param validation_bbox_losses:
-    :param training_learning_rates: List of optimiser learning rates.
-    :param save_path: Directory to save image into.
-    """
-    epochs = range(1, len(training_losses) + 1)
-    _, ax = plt.subplots(nrows=2, ncols=3, layout='constrained', figsize=(16, 9), dpi=200)
-    ax[0, 0].set_title('Training Losses (weighted)\n'
-                       'with Learning Rate')
-    ax[0, 0].plot(epochs, training_losses, marker='*')
-    ax[0, 0].set_xlabel('Epoch')
-    ax[0, 0].set_ylabel('Loss')
-    ax_lr = ax[0, 0].twinx()
-    ax_lr.plot(epochs, [i * 100 for i in training_learning_rates], color='red', label='learning rate')
-    ax_lr.set_ylabel('Learning Rate x10$^-2$')
-    ax_lr.legend(loc='upper right')
-
-    ax[0, 1].set_title('Training Classification Losses')
-    ax[0, 1].plot(epochs, training_cls_losses, marker='*')
-    ax[0, 1].set_xlabel('Epoch')
-    ax[0, 1].set_ylabel('Loss')
-
-    ax[0, 2].set_title('Training Box Regression Losses')
-    ax[0, 2].plot(epochs, training_bbox_losses, marker='*')
-    ax[0, 2].set_xlabel('Epoch')
-    ax[0, 2].set_ylabel('Loss')
-
-    ax[1, 0].set_title('Validation Losses (unweighted)')
-    ax[1, 0].plot(epochs, validation_losses, marker='*')
-    ax[1, 0].set_xlabel('Epoch')
-    ax[1, 0].set_ylabel('Loss')
-
-    ax[1, 1].set_title('Validation Classification Losses')
-    ax[1, 1].plot(epochs, validation_cls_losses, marker='*')
-    ax[1, 1].set_xlabel('Epoch')
-    ax[1, 1].set_ylabel('Loss')
-
-    ax[1, 2].set_title('Validation Box Regression Losses')
-    ax[1, 2].plot(epochs, validation_bbox_losses, marker='*')
-    ax[1, 2].set_xlabel('Epoch')
-    ax[1, 2].set_ylabel('Loss')
-
-    plt.savefig(join(save_path, 'losses.png'))
-    plt.close()
-
-
 def get_arg_parser():
     """
     Set up the parser for the main script.
@@ -89,7 +32,7 @@ def get_arg_parser():
     parser.add_argument('-e',
                         '--epochs',
                         type=int,
-                        default=300,
+                        default=1000,
                         help='Training epochs')
     parser.add_argument('-is',
                         '--image_size',
@@ -99,7 +42,7 @@ def get_arg_parser():
     parser.add_argument('-bs',
                         '--batch_size',
                         type=int,
-                        default=4,
+                        default=8,
                         help='Training batch size')
     parser.add_argument('-p',
                         '--patience',
@@ -109,13 +52,18 @@ def get_arg_parser():
     parser.add_argument('-pd',
                         '--patience_delta',
                         type=int,
-                        default=0.2,
+                        default=0.01,
                         help='Training patience delta')
     parser.add_argument('-lr',
                         '--learning_rate',
                         type=float,
                         default=0.01,
                         help='Optimiser learning rate')
+    parser.add_argument('-lres',
+                        '--learning_restart',
+                        type=int,
+                        default=150,
+                        help='Learning rate schedular restart frequency.')
     parser.add_argument('-m',
                         '--momentum',
                         type=float,
@@ -138,6 +86,67 @@ def get_arg_parser():
                         help='Weight applied to classification loss')
 
     return parser.parse_args()
+
+
+def plot_losses(best_epoch, training_losses, training_cls_losses, training_bbox_losses, validation_losses, validation_cls_losses,
+                validation_bbox_losses, training_learning_rates, save_path):
+    """
+    Plot the training losses (combined, cls, and bbox) and validation losses (combined, cls, and bbox) along with the
+    learning rates. The figure will be saved at save_path/losses.png. The losses and rates should be in a list
+    that grows as the epochs increase.
+
+
+    :param best_epoch: Best epoch for special marker.
+    :param training_losses: List of training losses.
+    :param training_cls_losses:
+    :param training_bbox_losses:
+    :param validation_losses: List of validation losses.
+    :param validation_cls_losses:
+    :param validation_bbox_losses:
+    :param training_learning_rates: List of optimiser learning rates.
+    :param save_path: Directory to save image into.
+    """
+    epochs = range(1, len(training_losses) + 1)
+    _, ax = plt.subplots(nrows=2, ncols=3, layout='constrained', figsize=(16, 9), dpi=200)
+
+    ax[0, 0].set_title('Training Classification Losses')
+    ax[0, 0].plot(epochs, training_cls_losses, marker='*')
+    ax[0, 0].axvline(x=best_epoch, color='green', linestyle='--')
+    ax[0, 0].set_xlabel('Epoch')
+    ax[0, 0].set_ylabel('Loss')
+
+    ax[0, 1].set_title('Training Box Regression Losses')
+    ax[0, 1].plot(epochs, training_bbox_losses, marker='*')
+    ax[0, 1].axvline(x=best_epoch, color='green', linestyle='--')
+
+    ax[0, 2].set_title('Training Losses (weighted)\n'
+                       'with Learning Rate')
+    ax[0, 2].plot(epochs, training_losses, marker='*')
+    ax_lr = ax[0, 2].twinx()
+    ax_lr.plot(epochs, [i * 100 for i in training_learning_rates], color='red', label='learning rate')
+    ax[0, 2].axvline(x=best_epoch, color='green', linestyle='--')
+    ax_lr.set_ylabel('Learning Rate x10$^{-2}$')
+    ax_lr.legend(loc='upper right')
+
+    ax[1, 0].set_title('Validation Classification Losses')
+    ax[1, 0].plot(epochs, validation_cls_losses, marker='*')
+    ax[1, 0].axvline(x=best_epoch, color='green', linestyle='--')
+    ax[1, 0].set_xlabel('Epoch')
+    ax[1, 0].set_ylabel('Loss')
+
+    ax[1, 1].set_title('Validation Box Regression Losses')
+    ax[1, 1].plot(epochs, validation_bbox_losses, marker='*')
+    ax[1, 1].axvline(x=best_epoch, color='green', linestyle='--')
+    ax[1, 1].set_xlabel('Epoch')
+
+    ax[1, 2].set_title('Validation Losses (unweighted)')
+    ax[1, 2].plot(epochs, validation_losses, marker='*')
+    ax[1, 2].axvline(x=best_epoch, color='green', linestyle='--', label='Best Validation Epoch')
+    ax[1, 2].set_xlabel('Epoch')
+    ax[1, 2].legend(loc='upper right')
+
+    plt.savefig(join(save_path, 'losses.png'))
+    plt.close()
 
 
 def plot_validation_results(validation_detections, validation_images, counter, save_path):

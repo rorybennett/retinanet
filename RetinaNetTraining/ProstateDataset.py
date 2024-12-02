@@ -11,23 +11,26 @@ from torchvision import tv_tensors
 
 
 class ProstateDataset(torch.utils.data.Dataset):
-    def __init__(self, root, transforms=None):
+    def __init__(self, root, transforms=None, augmentation_count=1):
         """
         Set the root and transforms variables. Do some minor dataset validation.
 
         :param root: Directory containing images and labels folders.
         :param transforms: Transformers to be used on this dataset.
+        :param augmentation_count: Increase dataset size by this amount (oversampling).
         """
         self.root = root
         self.transforms = transforms
+        self.augmentation_count = augmentation_count
         self.imgs = list(natsorted(os.listdir(os.path.join(root, "images"))))
         self.labels = list(natsorted(os.listdir(os.path.join(root, "labels"))))
 
         self.validate_dataset()
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.root, "images", self.imgs[idx])
-        label_path = os.path.join(self.root, "labels", self.labels[idx])
+        original_idx = idx // self.augmentation_count
+        img_path = os.path.join(self.root, "images", self.imgs[original_idx])
+        label_path = os.path.join(self.root, "labels", self.labels[original_idx])
         img = Image.open(img_path).convert("RGB")
         width, height = img.size
 
@@ -59,16 +62,20 @@ class ProstateDataset(torch.utils.data.Dataset):
             """
             This was problematic, so be careful about this. All box classes must be transformed in the same
             manner as the input image. Can check that transformations are operating as expected by plotting
-            before and after transforms are applied.
+            before and after transforms are applied. AutoAugment does unwanted things.
             """
             img_array = np.array(img)
             bboxes = tv_tensors.BoundingBoxes(target['boxes'], format="XYXY", canvas_size=img_array.shape[:2])
             img, bboxes_out = self.transforms(img, bboxes)
+
             target['boxes'] = bboxes_out
 
         return img, target
 
     def __len__(self):
+        return len(self.imgs) * self.augmentation_count
+
+    def get_image_count(self):
         return len(self.imgs)
 
     def validate_dataset(self):
