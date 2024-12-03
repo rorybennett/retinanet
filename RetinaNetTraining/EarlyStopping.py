@@ -14,7 +14,7 @@ class EarlyStopping:
         self.counter = 0
         self.best_score = None
         self.early_stop = False
-        self.val_loss_min = np.Inf
+        self.val_loss_min = np.inf
         self.best_epoch = 0
         # If current score within this range, it is considered the same as previous score.
         self.delta = delta

@@ -12,7 +12,7 @@
 module load python
 
 # Activate virtualenv
-source .venv/bin/activate
+source venv/bin/activate
 
 inputs=(
     "ProspectiveData/prostate_Combined/train_0"
@@ -36,9 +36,9 @@ inputs=(
 )
 
 
-training_path=${inputs[$((3 * SGE_TASK_ID - 2))]}
-validation_path=${inputs[$((3 * SGE_TASK_ID - 1))]}
-saving_path=${inputs[$((3 * SGE_TASK_ID))]}
+training_path=${inputs[$((3 * SGE_TASK_ID - 3))]}
+validation_path=${inputs[$((3 * SGE_TASK_ID - 2))]}
+saving_path=${inputs[$((3 * SGE_TASK_ID - 1))]}
 
 python training_retinanet.py \
   --train_path="./Datasets/$training_path" \

@@ -215,7 +215,7 @@ def main():
         print(f"\t{time_now}  -  Epoch {epoch + 1}/{total_epochs}, "
               f"Train Loss: {training_losses[-1]:0.4f}, "
               f"Validation Loss: {validation_losses[-1]:0.4f}, "
-              f"Learning Rate: {lr_schedular.get_last_lr()[0]:0.6f},", end=' ')
+              f"Learning Rate: {lr_schedular.get_last_lr()[0]:0.6f},", end=' ', flush=True)
 
         ################################################################################################################
         # Check for early stopping. If patience reached, plots must only go up to best result epoch.

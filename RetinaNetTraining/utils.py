@@ -57,7 +57,7 @@ def get_arg_parser():
     parser.add_argument('-lr',
                         '--learning_rate',
                         type=float,
-                        default=0.01,
+                        default=0.005,
                         help='Optimiser learning rate')
     parser.add_argument('-lres',
                         '--learning_restart',
