@@ -232,7 +232,7 @@ def main():
         # Check for early stopping. If patience reached, model is saved and final plots are made.
         ################################################################################################################
         final_epoch_reached = epoch
-        if final_epoch_reached > warmup_epochs:
+        if final_epoch_reached + 1 > warmup_epochs:
             early_stopping(epoch_validation_loss, custom_model.model, epoch, optimiser, save_path)
 
         utils.plot_losses(early_stopping.best_epoch + 1, training_losses, training_cls_losses, training_bbox_losses,

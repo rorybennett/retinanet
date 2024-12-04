@@ -43,4 +43,5 @@ saving_path=${inputs[$((3 * SGE_TASK_ID - 1))]}
 python training_retinanet.py \
   --train_path="./Datasets/$training_path" \
   --val_path="./Datasets/$validation_path" \
-  --save_path="/data/scratch/exx851/RetinaNetResults/$saving_path"
+  --save_path="/data/scratch/exx851/RetinaNetResults/$saving_path" \
+  --oversampling_factor=4

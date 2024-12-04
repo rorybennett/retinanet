@@ -34,6 +34,11 @@ def get_arg_parser():
                         type=int,
                         default=1000,
                         help='Training epochs')
+    parser.add_argument('-we',
+                        '--warmup_epochs',
+                        type=int,
+                        default=5,
+                        help='Epochs before checking for early stopping.')
     parser.add_argument('-is',
                         '--image_size',
                         type=int,
@@ -52,12 +57,12 @@ def get_arg_parser():
     parser.add_argument('-pd',
                         '--patience_delta',
                         type=int,
-                        default=0.01,
+                        default=0.005,
                         help='Training patience delta')
     parser.add_argument('-lr',
                         '--learning_rate',
                         type=float,
-                        default=0.005,
+                        default=0.01,
                         help='Optimiser learning rate')
     parser.add_argument('-lres',
                         '--learning_restart',
