@@ -8,72 +8,69 @@ import torch
 from PIL import Image
 from natsort import natsorted
 from torchvision import tv_tensors
+from torchvision.transforms.v2 import functional as F
 
 
 class ProstateDataset(torch.utils.data.Dataset):
-    def __init__(self, root, transforms=None, augmentation_count=1):
+    def __init__(self, root, transforms=None, oversampling_factor=1):
         """
         Set the root and transforms variables. Do some minor dataset validation.
 
         :param root: Directory containing images and labels folders.
         :param transforms: Transformers to be used on this dataset.
-        :param augmentation_count: Increase dataset size by this amount (oversampling).
+        :param oversampling_factor: Increase dataset size by this amount (oversampling).
         """
         self.root = root
         self.transforms = transforms
-        self.augmentation_count = augmentation_count
+        self.oversampling_factor = oversampling_factor
         self.imgs = list(natsorted(os.listdir(os.path.join(root, "images"))))
         self.labels = list(natsorted(os.listdir(os.path.join(root, "labels"))))
 
         self.validate_dataset()
 
     def __getitem__(self, idx):
-        original_idx = idx // self.augmentation_count
+        original_idx = idx // self.oversampling_factor
         img_path = os.path.join(self.root, "images", self.imgs[original_idx])
         label_path = os.path.join(self.root, "labels", self.labels[original_idx])
         img = Image.open(img_path).convert("RGB")
-        width, height = img.size
 
         # Read the label file
         boxes = []
+        labels = []
         with open(label_path) as f:
             for line in f:
                 parts = line.strip().split()
                 class_id = int(parts[0])
-                x_center, y_center, w, h = map(float, parts[1:])
-                # Convert normalized coordinates to absolute coordinates.
-                x_center *= width
-                y_center *= height
-                w *= width
-                h *= height
+                x_center, y_center, width, height = map(float, parts[1:])
 
-                # Convert to (x_min, y_min, x_max, y_max) format.
-                x_min = x_center - w / 2
-                y_min = y_center - h / 2
-                x_max = x_center + w / 2
-                y_max = y_center + h / 2
+                # Convert from YOLO format to FasterRCNN format
+                img_width, img_height = img.size
+                x_min = (x_center - width / 2) * img_width
+                y_min = (y_center - height / 2) * img_height
+                x_max = (x_center + width / 2) * img_width
+                y_max = (y_center + height / 2) * img_height
 
-                boxes.append([x_min, y_min, x_max, y_max, class_id])
+                boxes.append([x_min, y_min, x_max, y_max])
+
+                labels.append(class_id)
+
         # Convert boxes to the format expected by the model.
-        boxes = torch.tensor(boxes, dtype=torch.float32)
-        target = {'boxes': boxes[:, :4], 'labels': boxes[:, 4].long()}
+        boxes = torch.as_tensor(boxes, dtype=torch.float32)
+        labels = torch.as_tensor(labels, dtype=torch.int64)
+        img = tv_tensors.Image(img)
+
+        target = {
+            "boxes": tv_tensors.BoundingBoxes(boxes, format="XYXY", canvas_size=F.get_size(img)),
+            "labels": labels
+        }
 
         if self.transforms is not None:
-            """
-            This was problematic, so be careful about this. All box classes must be transformed in the same
-            manner as the input image. Can check that transformations are operating as expected by plotting
-            before and after transforms are applied. AutoAugment does unwanted things.
-            """
-            img_array = np.array(img)
-            bboxes = tv_tensors.BoundingBoxes(target['boxes'], format="XYXY", canvas_size=img_array.shape[:2])
-            img, bboxes_out = self.transforms(img, bboxes)
-
-            target['boxes'] = bboxes_out
+            img, target = self.transforms(img, target)
 
         return img, target
 
     def __len__(self):
-        return len(self.imgs) * self.augmentation_count
+        return len(self.imgs) * self.oversampling_factor
 
     def get_image_count(self):
         return len(self.imgs)

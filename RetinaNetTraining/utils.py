@@ -84,6 +84,11 @@ def get_arg_parser():
                         type=float,
                         default=0.5,
                         help='Weight applied to classification loss')
+    parser.add_argument('-of',
+                        '--oversampling_factor',
+                        type=int,
+                        default=1,
+                        help='How much oversampling is desired')
 
     return parser.parse_args()
 

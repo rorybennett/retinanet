@@ -12,6 +12,7 @@ from os.path import join
 
 import torch
 from torch import optim
+from torch.nn.utils import clip_grad_norm_
 
 import CustomRetinaNet
 import utils
@@ -41,6 +42,7 @@ if not os.path.isdir(save_path):
 image_size = args.image_size  # Image size for resizing, used in training and validation.
 batch_size = args.batch_size  # Batch size for loader.
 total_epochs = args.epochs  # Training epochs.
+warmup_epochs = args.warmup_epochs  # Epochs before early stop checks are done.
 patience = args.patience  # Early stopping patience.
 patience_delta = args.patience_delta  # Early stopping delta.
 learning_rate = args.learning_rate  # Optimiser learning rate.
@@ -49,6 +51,7 @@ momentum = args.momentum  # Optimiser momentum.
 weight_decay = args.weight_decay  # Optimiser weight decay.
 box_weight = args.box_weight  # Weight applied to box loss.
 cls_weight = args.box_weight  # Weight applied to classification loss.
+oversampling_factor = args.oversampling_factor  # Oversampling factor.
 
 ########################################################################################################################
 # Transformers used during data loading.
@@ -59,7 +62,7 @@ val_transforms = CustomRetinaNet.get_validation_transforms(image_size)
 ########################################################################################################################
 # Set up datasets.
 ########################################################################################################################
-train_dataset = ProstateDataset(root=train_path, transforms=train_transforms, augmentation_count=2)
+train_dataset = ProstateDataset(root=train_path, transforms=train_transforms, oversampling_factor=oversampling_factor)
 val_dataset = ProstateDataset(root=val_path, transforms=val_transforms)
 
 ########################################################################################################################
@@ -77,19 +80,20 @@ print('Loading model...', end=' ')
 custom_model = CustomRetinaNet.CustomRetinaNet()
 custom_model.model.to(device)
 optimiser = optim.SGD(custom_model.model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-# lr_schedular = optim.lr_scheduler.CosineAnnealingLR(optimiser, T_max=50, eta_min=0)
 lr_schedular = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimiser, T_0=learning_restart, eta_min=0)
 print(f'Model loaded.')
+
 ########################################################################################################################
 # Save training parameters to file and display to screen.
 ########################################################################################################################
 with open(join(save_path, 'training_parameters.txt'), 'w') as save_file:
     save_file.write(f'Start time: {script_start}\n'
-                    f''f'Training dataset: {train_path}\n'
+                    f'Training dataset: {train_path}\n'
                     f'Validation dataset: {val_path}\n'
                     f'Save path: {save_path}\n'
                     f'Batch size: {batch_size}\n'
                     f'Epochs: {total_epochs}\n'
+                    f'Warmup Epochs: {warmup_epochs}\n'
                     f'Device: {device}\n'
                     f'Patience: {patience}\n'
                     f'Patience delta: {patience_delta}\n'
@@ -112,6 +116,7 @@ print('=========================================================================
       f'Saving to: {save_path}.\n'
       f'Batch size: {batch_size}.\n'
       f'Epochs: {total_epochs}.\n'
+      f'Warmup Epochs: {warmup_epochs}.\n'
       f'Device: {device}\n'
       f'Patience: {patience}.\n'
       f'Patience delta: {patience_delta}.\n'
@@ -154,13 +159,19 @@ def main():
 
             optimiser.zero_grad()
             loss_dict = custom_model.forward(images, targets)
-            # Apply weight to classification and bbox regression losses.
+            # Extract each loss.
             cls_loss = loss_dict['classification']
             bbox_loss = loss_dict['bbox_regression']
-
+            # Calculate total loss, can apply weights here.
             losses = cls_loss * cls_weight + bbox_loss * box_weight
+            # Check for NaNs or Infs.
+            if torch.isnan(losses).any() or torch.isinf(losses).any():
+                print("Loss has NaNs or Infs, skipping this batch")
+                continue
             # Calculate gradients.
             losses.backward()
+            # Apply gradient clipping.
+            clip_grad_norm_(custom_model.model.parameters(), 2)
             optimiser.step()
             # Epoch loss per batch.
             epoch_train_loss += losses.item()
@@ -189,7 +200,7 @@ def main():
                 images = list(image.to(device) for image in images)
                 targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-                loss_dict, _ = custom_model.forward(images, targets, return_losses=True)
+                loss_dict, _ = custom_model.forward(images, targets)
 
                 cls_loss = loss_dict['classification']
                 bbox_loss = loss_dict['bbox_regression']
@@ -218,22 +229,19 @@ def main():
               f"Learning Rate: {lr_schedular.get_last_lr()[0]:0.6f},", end=' ', flush=True)
 
         ################################################################################################################
-        # Check for early stopping. If patience reached, plots must only go up to best result epoch.
+        # Check for early stopping. If patience reached, model is saved and final plots are made.
         ################################################################################################################
         final_epoch_reached = epoch
-        early_stopping(epoch_validation_loss, custom_model.model, epoch, optimiser, save_path)
+        if final_epoch_reached > warmup_epochs:
+            early_stopping(epoch_validation_loss, custom_model.model, epoch, optimiser, save_path)
+
+        utils.plot_losses(early_stopping.best_epoch + 1, training_losses, training_cls_losses, training_bbox_losses,
+                          validation_losses, validation_cls_losses, validation_bbox_losses,
+                          training_learning_rates, save_path)
         if early_stopping.early_stop:
             print('Patience reached, stopping early.')
-            utils.plot_losses(early_stopping.best_epoch, training_losses[:epoch - patience],
-                              training_cls_losses[:epoch - patience], training_bbox_losses[:epoch - patience],
-                              validation_losses[:epoch - patience], validation_cls_losses[:epoch - patience],
-                              validation_bbox_losses[:epoch - patience], training_learning_rates[:epoch - patience],
-                              save_path)
             break
         else:
-            utils.plot_losses(early_stopping.best_epoch, training_losses, training_cls_losses, training_bbox_losses,
-                              validation_losses, validation_cls_losses, validation_bbox_losses,
-                              training_learning_rates, save_path)
             print()
 
     ####################################################################################################################

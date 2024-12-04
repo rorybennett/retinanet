@@ -5,8 +5,8 @@
 #$ -j y                 # Join output and error files.
 #$ -o outputs/          # Change default output directory.
 #$ -l gpu=1             # Request GPU usage.
-#$ -t 1-18               # Array job.
-#$ -tc 18                # Concurrent jobs.
+#$ -t 1-6               # Array job.
+#$ -tc 6                # Concurrent jobs.
 #$ -m bea               # Email beginning, end, and aborted.
 
 module load python
