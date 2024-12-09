@@ -257,7 +257,7 @@ def main():
 
             _, detections = custom_model.forward(images, targets)
 
-            utils.plot_validation_results(detections, images, counter, save_path)
+            utils.plot_validation_results(detections, images, 0, counter, save_path)
 
             counter += batch_size
 
