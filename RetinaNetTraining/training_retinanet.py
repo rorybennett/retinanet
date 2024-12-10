@@ -205,7 +205,7 @@ def main():
                 cls_loss = loss_dict['classification']
                 bbox_loss = loss_dict['bbox_regression']
 
-                losses = cls_loss + bbox_loss
+                losses = cls_loss * cls_weight + bbox_loss * box_weight
 
                 epoch_validation_loss += losses.item()
                 epoch_validation_cls_loss += cls_loss.item()
